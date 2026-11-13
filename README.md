@@ -1,3 +1,27 @@
+# Storme Viewer
+
+Storme Viewer is a Second Life viewer by AstralaDev.
+
+It is a fork of [Aurora Viewer](https://github.com/Aurora-Viewer/Aurora-Viewer)
+(Rust, wgpu / Vulkan, egui), licensed under the GNU GPL v3. Aurora's work and
+history are kept, and its code is merged in from the `upstream` remote.
+Storme Viewer is a third-party viewer, not provided or supported by Linden Lab.
+
+## What Storme adds
+
+- Motion blur, volumetric lighting (godrays) and the Reinhard, Uncharted 2 and
+  Filmic tone mappers, after [Black Dragon Viewer](https://github.com/NiranV/Black-Dragon-Viewer)
+  (LGPL 2.1).
+- More to come: see `TASKS.md`.
+
+## Credits and license
+
+GPL v3, see `LICENSE`. Third-party notices are in `NOTICE.md`. The Aurora name
+and wolf logo belong to the Aurora project and are not used here. The
+documentation below is Aurora's own and still applies to the code.
+
+---
+
 <div align="center">
 
 <img src="assets/branding/aurora-logo.svg" alt="Aurora Viewer" width="180">

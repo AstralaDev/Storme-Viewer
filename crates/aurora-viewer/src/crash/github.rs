@@ -11,12 +11,12 @@ use serde_json::Value;
 use std::time::{Duration, Instant};
 
 const API: &str = "https://api.github.com/repos/Aurora-Viewer/Aurora-Viewer/issues";
-pub const ISSUES: &str = "https://github.com/Aurora-Viewer/Aurora-Viewer/issues";
+pub const ISSUES: &str = "https://github.com/AstralaDev/Storme-Viewer/issues";
 pub const VERIFY: &str = "https://github.com/login/device";
 const TOKEN: &str = "https://github.com/login/oauth/access_token";
 // Public identifier of the project's GitHub App (Device Flow enabled).
 const CLIENT_ID: &str = "Iv23liT7PLWClMLztI1W";
-const SERVICE: &str = "Aurora Viewer GitHub";
+const SERVICE: &str = "Storme Viewer GitHub";
 const ACCOUNT: &str = "crash-reports";
 /// The credential store's entry of the authorization (service, account),
 /// for the removal from this computer (`uninstall.rs`).
