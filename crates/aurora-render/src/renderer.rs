@@ -1861,6 +1861,10 @@ pub(crate) struct Backend {
     glow: Glow,
     /// Depth of field, made the first time it is on.
     dof: Option<crate::dof::Dof>,
+    /// Motion blur, made the first time it is on.
+    motion_blur: Option<crate::motion_blur::MotionBlurPass>,
+    /// Volumetric lighting, made the first time it is on.
+    godrays: Option<crate::godrays::GodrayPass>,
     /// The photo's look, made the first time one is on.
     looks: Option<crate::looks::Looks>,
     rlva_spheres: Option<crate::rlva::Spheres>,
@@ -4011,6 +4015,8 @@ impl Backend {
             shadow_sampler,
             glow,
             dof: None,
+            motion_blur: None,
+            godrays: None,
             looks: None,
             rlva_spheres: None,
             motion_debug,
@@ -5859,6 +5865,12 @@ impl Backend {
         if let Some(dof) = &mut self.dof {
             dof.release();
         }
+        if let Some(mb) = &mut self.motion_blur {
+            mb.release();
+        }
+        if let Some(g) = &mut self.godrays {
+            g.release();
+        }
         if let Some(looks) = &mut self.looks {
             looks.release();
         }
@@ -7488,7 +7500,7 @@ impl Backend {
         self.show_ao_method();
         self.contact_now = self.contact_on(f.shadows);
         self.gtao_normals_now = self.targets.gtao_shown && gtao_mesh_normals_now();
-        self.motion_now = self.gtao_normals_now || self.taa.is_some();
+        self.motion_now = self.gtao_normals_now || self.taa.is_some() || f.motion_blur.is_some();
         // nothing kept the matrices while nothing read the motion: the
         // first frame that reads it again starts the history again
         self.motion_cut |= self.motion_now && !self.motion_kept;
@@ -7964,6 +7976,9 @@ impl Backend {
                 match self.settings.tonemapper {
                     Tonemapper::KhronosNeutral => 0.0,
                     Tonemapper::Aces => 1.0,
+                    Tonemapper::Reinhard => 3.0,
+                    Tonemapper::Uncharted2 => 4.0,
+                    Tonemapper::Filmic => 5.0,
                 }
             },
             fxaa: if self.settings.aa == AntiAliasing::Fxaa { 1.0 } else { 0.0 },
@@ -10150,6 +10165,111 @@ impl Backend {
             } else if let Some(w) = taa_written {
                 post_bg = &taa.post_bgs[w];
                 post_src = &taa.history[w];
+            }
+        }
+        // ---- motion blur (Black Dragon's RenderMotionBlur), on the resolved
+        // image from the prepass's motion, before the depth of field
+        let motion_tex = motion_view(self.motion_now, &self.targets, self.taa.as_ref());
+        let blur_on = f.motion_blur.is_some() && motion_tex.is_some() && !self.motion_cut && snapshot.is_none() && !f.cutout;
+        match (&f.motion_blur, motion_tex, blur_on, self.prev_view_proj) {
+            (Some(params), Some(motion), true, Some(prev_vp)) => {
+                let inputs = crate::dof::PostInputs {
+                    layout: &self.post_layout,
+                    sampler: &self.post_sampler,
+                    buffer: &self.post_buffer,
+                    glow: &self.glow.views[1],
+                };
+                let mb = self
+                    .motion_blur
+                    .get_or_insert_with(|| crate::motion_blur::MotionBlurPass::new(&self.device, HDR_FORMAT));
+                let ready = mb.has_targets(post_size) || {
+                    let (_, refused) = crate::gpu_alloc::scoped(&self.device, || mb.ensure_targets(&self.device, post_size, HDR_FORMAT, &inputs));
+                    if first_use(&mut self.oom, "motion blur", false, refused && !self.lost.get()) {
+                        mb.release();
+                        false
+                    } else {
+                        true
+                    }
+                };
+                if ready {
+                    mb.encode(
+                        &self.device,
+                        &self.queue,
+                        &mut encoder,
+                        post_src,
+                        post_depth,
+                        motion,
+                        unjittered_vp,
+                        prev_vp,
+                        params,
+                        taa_motion_now(),
+                    );
+                    if let (Some(out), Some(bg)) = (mb.output(), mb.post_bind_group()) {
+                        post_src = out;
+                        post_bg = bg;
+                    }
+                }
+            }
+            _ => {
+                if let Some(mb) = &mut self.motion_blur {
+                    mb.release();
+                }
+            }
+        }
+        // ---- volumetric lighting (Black Dragon's RenderVolumetricLighting),
+        // from the sun's shadow cascades, before the depth of field
+        let godrays_on = f.godrays.is_some() && main.params[2] > 0.5 && main.sun_dir[3] > 0.0 && snapshot.is_none() && !f.cutout;
+        match (&f.godrays, godrays_on) {
+            (Some(params), true) => {
+                let inputs = crate::dof::PostInputs {
+                    layout: &self.post_layout,
+                    sampler: &self.post_sampler,
+                    buffer: &self.post_buffer,
+                    glow: &self.glow.views[1],
+                };
+                let g = self
+                    .godrays
+                    .get_or_insert_with(|| crate::godrays::GodrayPass::new(&self.device, HDR_FORMAT));
+                let ready = g.has_targets(post_size) || {
+                    let (_, refused) = crate::gpu_alloc::scoped(&self.device, || g.ensure_targets(&self.device, post_size, HDR_FORMAT, &inputs));
+                    if first_use(&mut self.oom, "volumetric lighting", false, refused && !self.lost.get()) {
+                        g.release();
+                        false
+                    } else {
+                        true
+                    }
+                };
+                if ready {
+                    let (blue, haze) = (main.sky_blue_density[0], main.sky_blue_density[3]);
+                    g.encode(
+                        &self.device,
+                        &self.queue,
+                        &mut encoder,
+                        post_src,
+                        post_depth,
+                        &crate::godrays::Sun {
+                            inv_view_proj: unjittered_vp.inverse(),
+                            cascade_vp: main.cascade_vp,
+                            splits: main.cascade_splits,
+                            camera_pos: main.camera_pos,
+                            sunlight: [main.sky_sunlight[0], main.sky_sunlight[1], main.sky_sunlight[2]],
+                            visible: main.sun_dir[3],
+                            haze_weight: haze / (blue + haze).max(1e-6),
+                            shadow_map: &self.shadow_view,
+                            shadow_sampler: &self.shadow_sampler,
+                        },
+                        params,
+                    );
+                    if let (Some(out), Some(bg)) = (g.output(), g.post_bind_group()) {
+                        post_src = out;
+                        post_bg = bg;
+                    }
+                }
+            }
+            _ => {
+                if let Some(g) = &mut self.godrays {
+                    g.release();
+                }
             }
         }
         // ---- depth of field, on the resolved (and TAA-steady) image,

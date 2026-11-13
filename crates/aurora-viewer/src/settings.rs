@@ -640,6 +640,15 @@ pub struct Settings {
     pub exposure: f32,
     /// Contrast adaptive sharpening (Firestorm RenderCASSharpness, 0.4).
     pub sharpen: f32,
+    /// Motion blur (Black Dragon's RenderMotionBlurStrength): the shutter's
+    /// share of the frame, 0 (off) to 2. Reads the depth prepass's motion, so
+    /// it needs TAA (or GTAO) on.
+    pub motion_blur: f32,
+    /// Volumetric lighting, godrays (Black Dragon's RenderVolumetricLighting,
+    /// off by default there as here). Needs the sun's shadows.
+    pub godrays: bool,
+    /// Its strength (RenderVolumetricLightingMultiplier, 1).
+    pub godray_strength: f32,
     /// Glow of faces with a glow value (Firestorm RenderGlow, on).
     pub glow: bool,
     /// Aurora's bloom around the bright parts of the image (the Legacy
@@ -1479,7 +1488,8 @@ pub struct Settings {
     /// experimental setting, off by default.
     pub colored_sky_ambient: bool,
     /// 0 Khronos PBR Neutral, 1 ACES (RenderTonemapType: ACES by default,
-    /// like the Legacy Viewer)
+    /// like the Legacy Viewer), then Black Dragon's 2 Reinhard, 3 Uncharted 2
+    /// and 4 Filmic
     pub tonemapper: u8,
     /// Share of the tone mapped color over the exposed linear one, on skies
     /// that are not classic (RenderTonemapMix, 0.7 like the Legacy Viewer).
@@ -2118,6 +2128,9 @@ impl Default for Settings {
             night_sky_milky_way: crate::world::night_sky::DEFAULT_MILKY_WAY,
             exposure: 1.0,
             sharpen: 0.4,
+            motion_blur: 0.0,
+            godrays: false,
+            godray_strength: 1.0,
             glow: true,
             bloom: false,
             bloom_strength: BLOOM_STRENGTH,
@@ -3217,6 +3230,16 @@ impl Settings {
         } else {
             0.4
         };
+        self.godray_strength = if self.godray_strength.is_finite() {
+            self.godray_strength.clamp(0.0, 4.0)
+        } else {
+            1.0
+        };
+        self.motion_blur = if self.motion_blur.is_finite() {
+            self.motion_blur.clamp(0.0, 2.0)
+        } else {
+            0.0
+        };
         self.bloom_strength = if self.bloom_strength.is_finite() {
             self.bloom_strength.clamp(0.05, 1.0)
         } else {
@@ -3281,7 +3304,7 @@ impl Settings {
         } else {
             512.0
         };
-        self.tonemapper = self.tonemapper.min(1);
+        self.tonemapper = self.tonemapper.min(4);
         self.tonemap_mix = if self.tonemap_mix.is_finite() {
             self.tonemap_mix.clamp(0.0, 1.0)
         } else {
@@ -3534,10 +3557,12 @@ impl Settings {
                 _ => AntiAliasing::Smaa,
             },
             fsr_sharpness: (self.fsr_sharpness > 0).then(|| self.fsr_sharpness.min(100) as f32 / 100.0),
-            tonemapper: if self.tonemapper == 1 {
-                Tonemapper::Aces
-            } else {
-                Tonemapper::KhronosNeutral
+            tonemapper: match self.tonemapper {
+                1 => Tonemapper::Aces,
+                2 => Tonemapper::Reinhard,
+                3 => Tonemapper::Uncharted2,
+                4 => Tonemapper::Filmic,
+                _ => Tonemapper::KhronosNeutral,
             },
             hdr: self.hdr_emissive,
             shadow_resolution: self.shadow_params().0,

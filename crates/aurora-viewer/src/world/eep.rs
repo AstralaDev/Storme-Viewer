@@ -69,6 +69,21 @@ pub struct SkyFrame {
     pub halo_id: Uuid,
 }
 
+/// AURORA_DEMO_SKY_AMBIANCE=<0..1>: the default sky takes this reflection probe
+/// ambiance, so that it is a modern sky (tone mapped, auto adjusted) instead of
+/// a classic one, to try the tone mappers and the godrays in demo mode, where no
+/// region sends its own. Unset in normal use.
+fn demo_probe_ambiance() -> Option<f32> {
+    static VALUE: std::sync::OnceLock<Option<f32>> = std::sync::OnceLock::new();
+    *VALUE.get_or_init(|| {
+        std::env::var("AURORA_DEMO_SKY_AMBIANCE")
+            .ok()
+            .and_then(|v| v.trim().parse::<f32>().ok())
+            .filter(|v| v.is_finite() && *v > 0.0)
+            .map(|v| v.min(1.0))
+    })
+}
+
 impl Default for SkyFrame {
     /// LLSettingsSky::defaults() with the legacy haze defaults.
     fn default() -> Self {
@@ -102,8 +117,8 @@ impl Default for SkyFrame {
             gamma: 1.0,
             dome_offset: LEGACY_DOME_OFFSET,
             dome_radius: LEGACY_DOME_RADIUS,
-            probe_ambiance: 0.0,
-            can_auto_adjust: true,
+            probe_ambiance: demo_probe_ambiance().unwrap_or(0.0),
+            can_auto_adjust: demo_probe_ambiance().is_none(),
             moisture_level: 0.0,
             droplet_radius: 800.0,
             ice_level: 0.0,

@@ -6,7 +6,7 @@
 struct PostParams {
     exposure: f32,
     output_srgb: f32,
-    tonemapper: f32, // 0 Khronos PBR Neutral, 1 ACES, 2 none (classic skies)
+    tonemapper: f32, // 0 Khronos PBR Neutral, 1 ACES, 2 none (classic skies), 3 Reinhard, 4 Uncharted 2, 5 Filmic
     fxaa: f32,
     sharpen: f32, // AMD CAS sharpness (0 = off)
     glow: f32,    // 1: add the blurred glow (glowcombineF.glsl)
@@ -95,6 +95,41 @@ fn aces(x: vec3<f32>) -> vec3<f32> {
     return clamp(ACES_OUTPUT * (a / b), vec3<f32>(0.0), vec3<f32>(1.0));
 }
 
+// Extended Reinhard on the luminance (PBRReinhardToneMapping,
+// tonemapUtilF.glsl, Black Dragon's RenderTonemapType 2).
+fn reinhard(color: vec3<f32>) -> vec3<f32> {
+    let white = 2.0;
+    let luma = max(dot(color, vec3<f32>(0.2126, 0.7152, 0.0722)), 1e-6);
+    let mapped = luma * (1.0 + luma / (white * white)) / (1.0 + luma);
+    return color * (mapped / luma);
+}
+
+// John Hable's Uncharted 2 curve (Uncharted2ToneMapping, tonemapUtilF.glsl,
+// Black Dragon's type 3), with its exposure bias of 2.
+fn uncharted2_curve(x: vec3<f32>) -> vec3<f32> {
+    let a = 0.15;
+    let b = 0.50;
+    let c = 0.10;
+    let d = 0.20;
+    let e = 0.02;
+    let f = 0.30;
+    return ((x * (a * x + c * b) + d * e) / (x * (a * x + b) + d * f)) - e / f;
+}
+
+fn uncharted2(color: vec3<f32>) -> vec3<f32> {
+    let white = uncharted2_curve(vec3<f32>(11.2));
+    return uncharted2_curve(color * 2.0) / white;
+}
+
+// Haarm-Peter Duiker's filmic curve (FilmicToneMapping, tonemapUtilF.glsl,
+// Black Dragon's type 4): its output is already display encoded, the
+// pow 2.2 brings it back to the linear light the post pass encodes.
+fn filmic(color: vec3<f32>) -> vec3<f32> {
+    let x = max(vec3<f32>(0.0), color - vec3<f32>(0.004));
+    let r = (x * (6.2 * x + 0.5)) / (x * (6.2 * x + 1.7) + vec3<f32>(0.06));
+    return pow(r, vec3<f32>(2.2));
+}
+
 // Preferences' exposure times the automatic one (final_exposure).
 fn exposure() -> f32 {
     return post.exposure * post.auto_exposure;
@@ -105,15 +140,18 @@ fn exposure() -> f32 {
 fn tonemap(c: vec3<f32>) -> vec3<f32> {
     let e = max(c * exposure(), vec3<f32>(0.0));
     var m: vec3<f32>;
-    if (post.tonemapper > 1.5) {
+    let kind = i32(post.tonemapper + 0.5);
+    if (kind == 2) {
         // classic skies (tonemapUtilF NO_POST): exposure, then clamp
         m = e;
     } else {
         var t: vec3<f32>;
-        if (post.tonemapper > 0.5) {
-            t = aces(e);
-        } else {
-            t = neutral(e);
+        switch (kind) {
+            case 1: { t = aces(e); }
+            case 3: { t = reinhard(e); }
+            case 4: { t = uncharted2(e); }
+            case 5: { t = filmic(e); }
+            default: { t = neutral(e); }
         }
         m = mix(e, t, post.tonemap_mix);
     }

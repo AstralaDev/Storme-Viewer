@@ -1075,6 +1075,10 @@ pub enum Tonemapper {
     /// Khronos PBR Neutral (Second Life's tone mapper).
     KhronosNeutral,
     Aces,
+    /// Black Dragon's RenderTonemapType 2, 3 and 4.
+    Reinhard,
+    Uncharted2,
+    Filmic,
 }
 
 /// Quality settings applied with `Renderer::apply_settings`.
@@ -1585,6 +1589,12 @@ pub struct FrameParams {
     pub debug: DebugRender,
     /// Depth of field (RenderDepthOfField); None: off, at no cost.
     pub dof: Option<DepthOfField>,
+    /// Motion blur (Black Dragon's RenderMotionBlur); None: off, at no cost.
+    /// Reads the depth prepass's motion, so it needs TAA or GTAO on.
+    pub motion_blur: Option<MotionBlur>,
+    /// Volumetric lighting (Black Dragon's RenderVolumetricLighting); None:
+    /// off, at no cost. Needs the sun's shadows.
+    pub godrays: Option<Godrays>,
     /// A cut-out photo (cutout.rs): no sky, terrain or water, no glow, and
     /// what is drawn keeps its coverage, in the snapshot's alpha or over a
     /// checkerboard on the live view.
@@ -1643,6 +1653,32 @@ pub struct DepthOfField {
     /// Focus peaking (the photo viewfinder's manual focus): the sharp
     /// edges painted this linear colour.
     pub peaking: Option<[f32; 3]>,
+}
+
+/// Motion blur of the frame (Black Dragon's RenderMotionBlur and
+/// RenderMotionBlurStrength).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct MotionBlur {
+    /// The shutter's share of the frame: 1 smears each pixel over the whole
+    /// of its motion since the last frame.
+    pub strength: f32,
+    /// Samples along the smear.
+    pub samples: u32,
+    /// Longest smear, as a share of the image's size.
+    pub max_smear: f32,
+}
+
+/// Volumetric lighting of the frame (Black Dragon's
+/// RenderVolumetricLightingMultiplier, ...Resolution and ...FalloffMultiplier).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Godrays {
+    /// godray_multiplier: how strong the shafts are (1).
+    pub strength: f32,
+    /// godray_res: steps along each pixel's ray (32).
+    pub steps: u32,
+    /// falloff_multiplier: how fast the shafts fade with the distance
+    /// (0.001).
+    pub falloff: f32,
 }
 
 /// Views shown instead of the image, and checks painted over it

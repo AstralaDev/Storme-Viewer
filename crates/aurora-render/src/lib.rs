@@ -21,6 +21,8 @@ mod dedicated;
 mod device_lost;
 pub use device_lost::{GPU_WORK_NONE, GPU_WORK_VERDICTS, in_guarded_poll, is_loss_panic, loss_details};
 mod dof;
+mod godrays;
+mod motion_blur;
 mod drawn_pick;
 mod exposure;
 pub mod frame_priority;

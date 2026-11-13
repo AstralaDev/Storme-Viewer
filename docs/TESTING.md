@@ -461,6 +461,7 @@ the background still applies outside screenshots.
 | `AURORA_CAPTURE_FRAMES=<n>` | Frame captured (240 by default) |
 | `AURORA_CAPTURE_EXIT=1` | Quits after the screenshot |
 | `AURORA_DEMO_RENDER_TEXTURE=1` | Captures the demo world through a caller-owned render target |
+| `AURORA_DEMO_SKY_AMBIANCE=<0..1>` | The default sky takes this reflection probe ambiance: a modern sky, so the tone mapper choice and the godrays can be tried in demo mode (off: a classic sky) |
 | `AURORA_DEMO_XR_DEVICE=1` | Uses OpenXR-compatible Vulkan initialization for the Linux demo |
 | `AURORA_OPENXR_LOADER=<path>` | Explicit macOS OpenXR loader dylib for runtime tests |
 | `AURORA_DEMO_XR_WORLD=1` | Sends the native demo world to OpenXR for a short stereo test |

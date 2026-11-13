@@ -11849,6 +11849,16 @@ impl App {
             all_lights: self.frame_profile.all_lights(),
             probe_walk_list: self.frame_profile.probe_walk_list(),
             debug: self.settings.debug.render(),
+            motion_blur: (self.settings.motion_blur > 0.0 && self.in_world()).then(|| aurora_render::MotionBlur {
+                strength: self.settings.motion_blur,
+                samples: 16,
+                max_smear: 0.08,
+            }),
+            godrays: (self.settings.godrays && self.in_world()).then(|| aurora_render::Godrays {
+                strength: self.settings.godray_strength,
+                steps: 32,
+                falloff: 0.001,
+            }),
             dof: {
                 // a photo is the part of the window's view its proportions
                 // frame: the window's lens, at the photo's pixels

@@ -852,6 +852,42 @@ fn light(cx: &mut Cx) {
             r.response.on_disabled_hover_text(tr!("ui-options-needs-hdr-emissive"));
             r.inner
         });
+        cx.row(
+            tr!("ui-options-motion-blur"),
+            tr!("ui-options-motion-blur-help"),
+            &field!(motion_blur),
+            |ui, s| {
+                ui.add(
+                    egui::Slider::new(&mut s.motion_blur, 0.0..=2.0)
+                        .custom_parser(aurora_i18n::parse_number)
+                        .step_by(0.05)
+                        .trailing_fill(true),
+                )
+                .changed()
+            },
+        );
+        cx.toggle(
+            tr!("ui-options-godrays"),
+            tr!("ui-options-godrays-help"),
+            &field!(godrays),
+        );
+        let godrays_off = !cx.s.godrays;
+        cx.subs(godrays_off, |cx| {
+            cx.row(
+                tr!("ui-options-godray-strength"),
+                tr!("ui-options-godray-strength-help"),
+                &field!(godray_strength),
+                |ui, s| {
+                    ui.add(
+                        egui::Slider::new(&mut s.godray_strength, 0.05..=4.0)
+                            .custom_parser(aurora_i18n::parse_number)
+                            .step_by(0.05)
+                            .trailing_fill(true),
+                    )
+                    .changed()
+                },
+            );
+        });
         cx.toggle(
             tr!("ui-options-glow"),
             tr!("ui-options-glow-around-glowing-faces-as-in-firestorm"),
@@ -1049,14 +1085,20 @@ fn image(cx: &mut Cx) {
         } else {
             tr!("ui-options-needs-hdr-emissive")
         };
-        cx.keywords("ACES Khronos PBR Neutral").row(
+        cx.keywords("ACES Khronos PBR Neutral Reinhard Uncharted Filmic").row(
             tr!("ui-options-tone-mapping"),
             tr!("ui-options-tone-mapping-help"),
             &field!(tonemapper),
             |ui, s| {
                 let mut changed = false;
                 ui.add_enabled_ui(mapped, |ui| {
-                    changed = super::super::combo(ui, &mut s.tonemapper, &[(0, tr!("ui-options-khronos-pbr-neutral")), (1, "ACES")]);
+                    changed = super::super::combo(ui, &mut s.tonemapper, &[
+                            (0, tr!("ui-options-khronos-pbr-neutral")),
+                            (1, "ACES"),
+                            (2, "Reinhard"),
+                            (3, "Uncharted 2"),
+                            (4, "Filmic"),
+                        ]);
                 })
                 .response
                 .on_disabled_hover_text(why);
