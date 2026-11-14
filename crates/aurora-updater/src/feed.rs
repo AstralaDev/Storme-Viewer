@@ -8,9 +8,12 @@ use semver::Version;
 use serde::Deserialize;
 use std::time::Duration;
 
-pub const RELEASES: &str = "https://api.github.com/repos/Aurora-Viewer/Aurora-Viewer/releases?per_page=100";
+/// Storme's own releases: the viewer is offered an update only from here, never from Aurora's.
+pub const RELEASES: &str = "https://api.github.com/repos/AstralaDev/Storme-Viewer/releases?per_page=100";
 pub const RELEASE_PAGE: &str = "https://github.com/AstralaDev/Storme-Viewer/releases";
-const DOWNLOADS: &str = "https://github.com/AstralaDev/Storme-Viewer/releases/download";
+/// Where the web and media support (media_pack) is downloaded from: Aurora's releases,
+/// until Storme publishes its own. The archive is checked against a fixed SHA-256 in the code.
+const DOWNLOADS: &str = "https://github.com/Aurora-Viewer/Aurora-Viewer/releases/download";
 pub const POLICY: &str = "aurora-update-policy.json";
 pub const MAX_ARCHIVE: u64 = 2 * 1024 * 1024 * 1024;
 /// How long an installation below a new minimum may still sign in, when
