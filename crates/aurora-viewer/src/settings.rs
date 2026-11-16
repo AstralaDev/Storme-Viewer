@@ -1270,6 +1270,16 @@ pub struct Settings {
     /// a hovered name plate), and egui's transitions end at once
     /// (`theme::apply_motion`).
     pub reduce_motion: bool,
+    /// Preferences › Appearance › Skin › Theme: a built-in look
+    /// (`crate::themes::ThemeId`), 0 the skin's own. An unknown number
+    /// (a newer build's theme) reads as 0.
+    pub ui_theme: u8,
+    /// How much of its own opacity the interface's glass keeps, 0.35..=1
+    /// (`crate::themes::set_glass`).
+    pub glass_opacity: f32,
+    /// How long the interface's transitions last, 0..=1 of egui's own
+    /// (`theme::apply_animation`); Reduce motion still ends them.
+    pub animation_intensity: f32,
     /// Preferences › Accessibility › Colour blindness: the interface's
     /// colours adapted to a colour vision deficiency (`crate::colorblind`),
     /// off by default.
@@ -2367,6 +2377,9 @@ impl Default for Settings {
             region_restart: Default::default(),
             collisions: Default::default(),
             reduce_motion: false,
+            ui_theme: 0,
+            glass_opacity: 1.0,
+            animation_intensity: 1.0,
             color_blindness: crate::colorblind::Deficiency::Off,
             color_blindness_strength: 1.0,
             high_contrast: false,
@@ -3234,6 +3247,17 @@ impl Settings {
             self.sharpen.clamp(0.0, 1.0)
         } else {
             0.4
+        };
+        self.ui_theme = crate::themes::ThemeId::from_u8(self.ui_theme) as u8;
+        self.glass_opacity = if self.glass_opacity.is_finite() {
+            self.glass_opacity.clamp(crate::themes::GLASS_MIN, 1.0)
+        } else {
+            1.0
+        };
+        self.animation_intensity = if self.animation_intensity.is_finite() {
+            self.animation_intensity.clamp(0.0, 1.0)
+        } else {
+            1.0
         };
         self.godray_strength = if self.godray_strength.is_finite() {
             self.godray_strength.clamp(0.0, 4.0)

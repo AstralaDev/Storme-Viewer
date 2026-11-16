@@ -21,6 +21,7 @@ pub fn page(cx: &mut Cx, tab: usize) {
         _ => {
             use aurora_i18n::tr;
             let p = cx.p;
+            themes(cx);
             interface_colors(cx);
             opacity(cx);
             cx.group(tr!("extra-skin"), |cx| {
@@ -47,6 +48,47 @@ pub fn page(cx: &mut Cx, tab: usize) {
             });
         }
     }
+}
+
+/// The built-in themes (`crate::themes`) and the two controls that shape
+/// any of them: the glass and the animation intensity. The accent,
+/// background and text colours below apply on top of the theme.
+fn themes(cx: &mut Cx) {
+    use aurora_i18n::tr;
+    cx.group(tr!("ui-options-theme"), |cx| {
+        cx.note(tr!("ui-options-theme-help"));
+        let choices: Vec<(u8, &str)> = crate::themes::ALL.iter().map(|t| (*t as u8, t.name())).collect();
+        cx.combo(tr!("ui-options-theme-pick"), tr!("ui-options-theme-pick-help"), &field!(ui_theme), &choices);
+        cx.greyed(crate::high_contrast::current());
+        cx.row(tr!("ui-options-glass-opacity"), tr!("ui-options-glass-opacity-help"), &field!(glass_opacity), |ui, s| {
+            ui.add(
+                egui::Slider::new(&mut s.glass_opacity, crate::themes::GLASS_MIN..=1.0)
+                    .custom_parser(aurora_i18n::parse_number)
+                    .step_by(0.05)
+                    .fixed_decimals(2)
+                    .trailing_fill(true),
+            )
+            .changed()
+        });
+        cx.greyed(false);
+        cx.greyed(cx.s.reduce_motion);
+        cx.row(
+            tr!("ui-options-animation-intensity"),
+            tr!("ui-options-animation-intensity-help"),
+            &field!(animation_intensity),
+            |ui, s| {
+                ui.add(
+                    egui::Slider::new(&mut s.animation_intensity, 0.0..=1.0)
+                        .custom_parser(aurora_i18n::parse_number)
+                        .step_by(0.05)
+                        .fixed_decimals(2)
+                        .trailing_fill(true),
+                )
+                .changed()
+            },
+        );
+        cx.greyed(false);
+    });
 }
 
 /// How much of the world shows through (`ui::surface_opacity`); the Legacy

@@ -181,7 +181,8 @@ impl Theme {
             danger_dim: hex(&self.danger_dim),
             indigo_light: hex(&self.indigo_light),
             on_accent: hex(&self.on_accent),
-            panel_alpha: self.panel_alpha,
+            // the glass of Preferences › Appearance (`crate::themes`)
+            panel_alpha: crate::themes::glass_alpha(self.panel_alpha),
             high_contrast: false,
         }
     }
@@ -256,7 +257,9 @@ impl Theme {
         w.active.bg_fill = p.indigo;
         w.active.weak_bg_fill = p.indigo;
         w.active.bg_stroke = Stroke::new(1.0, p.violet_light);
-        w.active.fg_stroke = Stroke::new(1.0, p.ink);
+        // the pressed face is the accent family: its text is the accent's,
+        // not the panel's (dark on a light theme)
+        w.active.fg_stroke = Stroke::new(1.0, p.on_accent);
         w.active.corner_radius = br;
         w.active.expansion = 0.0;
 
@@ -315,7 +318,14 @@ impl Theme {
 /// sliding) end at once; egui's duration otherwise. Checked every frame,
 /// since `Theme::apply` (a skin reload) restores egui's style.
 pub fn apply_motion(ctx: &egui::Context, reduce: bool) {
-    let wanted = if reduce { 0.0 } else { egui::Style::default().animation_time };
+    apply_animation(ctx, reduce, 1.0);
+}
+
+/// `apply_motion` with the animation intensity of Preferences › Appearance
+/// (0..=1, `crate::themes::animation_time`): a share of egui's transition
+/// time, none at all with Reduce motion.
+pub fn apply_animation(ctx: &egui::Context, reduce: bool, intensity: f32) {
+    let wanted = if reduce { 0.0 } else { crate::themes::animation_time(intensity) };
     if ctx.global_style().animation_time != wanted {
         ctx.all_styles_mut(|s| s.animation_time = wanted);
     }

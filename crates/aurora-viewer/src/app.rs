@@ -1582,7 +1582,9 @@ impl App {
         crate::high_contrast::set(wanted_high_contrast(&settings));
         crate::interface_colors::set(wanted_interface_colors(&settings));
         ui::surface_opacity::set(wanted_opacity(&settings));
-        let skin = Skin::load(&egui_ctx, "aurora", text_scale(&settings));
+        crate::themes::set_glass(settings.glass_opacity);
+        let mut skin = Skin::load(&egui_ctx, "aurora", text_scale(&settings));
+        skin.set_theme(&egui_ctx, crate::themes::ThemeId::from_u8(settings.ui_theme), text_scale(&settings));
         apply_chat_text_scale(&egui_ctx, &settings);
         crate::crash::update(&skin.theme, &settings);
         let palette = skin.theme.palette();
@@ -12521,7 +12523,7 @@ impl App {
             // In particular, never fsync the crash snapshot during a drag.
             self.egui_ctx.set_zoom_factor(ui_scale(&self.settings));
         }
-        crate::theme::apply_motion(&self.egui_ctx, self.settings.reduce_motion);
+        crate::theme::apply_animation(&self.egui_ctx, self.settings.reduce_motion, self.settings.animation_intensity);
         self.demo_gains_tick(Instant::now());
         if actions.settings_changed || std::mem::take(&mut self.snapshots.settings_changed) {
             aurora_i18n::select(&self.settings.language, crate::cli::get().language.as_deref());
@@ -12536,7 +12538,16 @@ impl App {
             let vision = wanted_vision(&self.settings);
             let high_contrast = wanted_high_contrast(&self.settings);
             let interface_colors = wanted_interface_colors(&self.settings);
-            if vision != crate::colorblind::current()
+            // a new theme or glass: the palette again too
+            let theme_changed = self.skin.set_theme(
+                &self.egui_ctx,
+                crate::themes::ThemeId::from_u8(self.settings.ui_theme),
+                text_scale(&self.settings),
+            );
+            let glass_changed = crate::themes::set_glass(self.settings.glass_opacity);
+            if theme_changed
+                || glass_changed
+                || vision != crate::colorblind::current()
                 || high_contrast != crate::high_contrast::current()
                 || interface_colors != crate::interface_colors::current()
             {

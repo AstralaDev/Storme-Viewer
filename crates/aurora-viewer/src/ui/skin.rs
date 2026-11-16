@@ -88,6 +88,8 @@ pub struct Skin {
     pub name: String,
     pub dir: Option<PathBuf>,
     pub theme: Theme,
+    /// The built-in theme in use (`crate::themes`); `Storme` is the skin's own.
+    pub builtin: crate::themes::ThemeId,
     pub layout: Layout,
     pub icons: Icons,
     stamp: Option<SystemTime>,
@@ -176,10 +178,26 @@ impl Skin {
             stamp: dir.as_deref().and_then(stamp),
             dir,
             theme,
+            builtin: crate::themes::ThemeId::Storme,
             layout,
             icons,
             last_check: Instant::now(),
         }
+    }
+
+    /// Switch to a built-in theme (or back to the skin's own `theme.json`
+    /// with `Storme`) and apply it at once. True when it changed.
+    pub fn set_theme(&mut self, ctx: &egui::Context, id: crate::themes::ThemeId, font_scale: f32) -> bool {
+        if id == self.builtin {
+            return false;
+        }
+        self.builtin = id;
+        self.theme = match id.theme() {
+            Some(theme) => theme,
+            None => self.dir.as_ref().map(|d| read_json::<Theme>(&d.join("theme.json"))).unwrap_or_default(),
+        };
+        self.theme.apply(ctx, font_scale);
+        true
     }
 
     /// Reload when files changed. Returns true if reloaded.
@@ -193,7 +211,9 @@ impl Skin {
         };
         let s = stamp(dir);
         if s != self.stamp {
+            let builtin = self.builtin;
             *self = Skin::load(ctx, &self.name.clone(), font_scale);
+            self.set_theme(ctx, builtin, font_scale);
             return true;
         }
         false

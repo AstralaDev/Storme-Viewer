@@ -99,6 +99,7 @@ mod system_info;
 mod system_notify;
 mod text_validation;
 mod theme;
+mod themes;
 mod tolerant;
 mod ui;
 mod ui_sound;
