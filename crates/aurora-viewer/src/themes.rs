@@ -71,7 +71,7 @@ impl ThemeId {
         let t = match self {
             ThemeId::Storme => return None,
             ThemeId::WhiteMatte => theme(&Colors {
-                accent: ["#5B5BD6", "#4A4AB8", "#7373E0", "#A9A9EE", "#6C6CD8"],
+                accent: ["#5B5BD6", "#4A4AB8", "#4A4AC4", "#3A3A9E", "#5252CC"],
                 surfaces: ["#F3F3F1", "#E6E6E3", "#FFFFFF", "#DCDCD8", "#FAFAF8"],
                 text: ["#23252B", "#565A66", "#6B6F7B"],
                 link: "#0B6E6E",
@@ -81,7 +81,7 @@ impl ThemeId {
                 radii: (6, 4),
             }),
             ThemeId::HelloKitty => theme(&Colors {
-                accent: ["#D93A73", "#C2305F", "#EC6C97", "#F6A8C3", "#D8527F"],
+                accent: ["#D93A73", "#C2305F", "#C2305F", "#9E1F4B", "#C0396A"],
                 surfaces: ["#FFF1F5", "#FFE0EA", "#FFFFFF", "#FFD0DF", "#FFF8FA"],
                 text: ["#4A1D2E", "#7A3F55", "#96566E"],
                 link: "#0E6F7E",
@@ -101,7 +101,7 @@ impl ThemeId {
                 radii: (8, 6),
             }),
             ThemeId::Sakura => theme(&Colors {
-                accent: ["#C94A74", "#A93A5D", "#E07796", "#F2B3C6", "#D4607F"],
+                accent: ["#C94A74", "#A93A5D", "#B03A62", "#8F2A4D", "#B8456B"],
                 surfaces: ["#FDF4F6", "#F9E6EC", "#FFFFFF", "#F3D3DD", "#FFFAFB"],
                 text: ["#3B2A31", "#6A4C57", "#82616C"],
                 link: "#2F6F4D",
@@ -137,7 +137,9 @@ impl ThemeId {
 
 /// One theme's colours, as written in `theme.json` terms.
 struct Colors {
-    /// violet, indigo, violet_light, violet_pale, indigo_light
+    /// violet, indigo, violet_light, violet_pale, indigo_light. The light and
+    /// pale ones are text and strokes on the panels: on a light theme they
+    /// are darker than the accent, not paler.
     accent: [&'static str; 5],
     /// panel, bar, field, raised, navy
     surfaces: [&'static str; 5],
@@ -254,6 +256,10 @@ mod tests {
                 ("muted text on the panel", hex(&t.muted), panel, 4.5),
                 ("dim text on the panel", hex(&t.muted_dim), panel, 3.0),
                 ("the accent on the panel", hex(&t.violet), panel, 3.0),
+                // used as text and strokes in the interface (chat's own lines, tags)
+                ("the pale accent (text) on the panel", hex(&t.violet_pale), panel, 4.5),
+                ("the light accent on the panel", hex(&t.violet_light), panel, 3.0),
+                ("the light indigo on the panel", hex(&t.indigo_light), panel, 3.0),
                 ("the links on the panel", hex(&t.teal), panel, 4.5),
                 ("the text on the accent", hex(&t.on_accent), hex(&t.violet), 3.0),
                 ("the text on the pressed accent", hex(&t.on_accent), hex(&t.indigo), 3.0),
