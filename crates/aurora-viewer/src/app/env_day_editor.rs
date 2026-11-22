@@ -23,6 +23,10 @@ pub(super) enum DayFetch {
 impl App {
     /// loadInventoryItem for a day cycle item (edit_context "inventory").
     pub(super) fn day_editor_load(&mut self, item: Uuid) {
+        // env_edit_extdaycycle is filtered under @setenv (rlvhandler.cpp)
+        if self.rlva_environment_windows_locked() {
+            return;
+        }
         let Some(it) = self.world.inventory.items.get(&item).cloned() else {
             return;
         };
@@ -183,15 +187,7 @@ impl App {
                 DayAction::SaveAs(name) => self.day_editor_save(Some(name)),
                 DayAction::ApplyLocal => {
                     if let Some(day) = self.day_editor.rendered().cloned() {
-                        let (length, offset) = (day.length, day.offset);
                         self.world.eep.apply_local_day(day);
-                        // its Aurora Weather (the ground track's) with it
-                        let weather = self
-                            .day_editor
-                            .doc
-                            .as_ref()
-                            .and_then(|d| crate::weather::region::RegionDay::read(&d.to_llsd(), 0, length, offset));
-                        self.world.eep.set_local_weather(weather);
                         self.day_editor.message = Some((aurora_i18n::tr!("ui-env-editor-applied").into(), false));
                     }
                 }

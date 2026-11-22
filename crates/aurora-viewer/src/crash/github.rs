@@ -10,7 +10,7 @@ use crossbeam_channel::{Receiver, Sender};
 use serde_json::Value;
 use std::time::{Duration, Instant};
 
-const API: &str = "https://api.github.com/repos/Aurora-Viewer/Aurora-Viewer/issues";
+const API: &str = "https://api.github.com/repos/AstralaDev/Storme-Viewer/issues";
 pub const ISSUES: &str = "https://github.com/AstralaDev/Storme-Viewer/issues";
 pub const VERIFY: &str = "https://github.com/login/device";
 const TOKEN: &str = "https://github.com/login/oauth/access_token";
@@ -344,14 +344,14 @@ fn runtime() -> Result<tokio::runtime::Runtime, Failure> {
 }
 
 fn client() -> Result<reqwest::Client, Failure> {
-    reqwest::Client::builder()
-        .user_agent(aurora_version::user_agent())
-        .https_only(true)
-        .retry(reqwest::retry::never())
-        .redirect(reqwest::redirect::Policy::none())
-        .timeout(Duration::from_secs(20))
-        .build()
-        .map_err(|_| Failure::Network)
+    aurora_proxy::http_client(|b| {
+        b.user_agent(aurora_version::user_agent())
+            .https_only(true)
+            .retry(reqwest::retry::never())
+            .redirect(reqwest::redirect::Policy::none())
+            .timeout(Duration::from_secs(20))
+    })
+    .map_err(|_| Failure::Network)
 }
 
 async fn json(mut response: reqwest::Response) -> Result<Value, Failure> {

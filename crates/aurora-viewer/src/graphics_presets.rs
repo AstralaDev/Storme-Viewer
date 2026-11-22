@@ -107,6 +107,7 @@ impl Preset {
                 reflection_probes: 0,
                 probe_count: 8,
                 antialiasing: 0,
+                blend_order: 0,
                 anisotropy: 1,
                 sharpen: 0.0,
                 // never written by a level (`apply`): the default
@@ -139,6 +140,7 @@ impl Preset {
                 reflection_probes: 0,
                 probe_count: 32,
                 antialiasing: 0,
+                blend_order: 0,
                 anisotropy: 1,
                 sharpen: 0.0,
                 glow: true,
@@ -170,6 +172,7 @@ impl Preset {
                 reflection_probes: 1,
                 probe_count: 64,
                 antialiasing: 1,
+                blend_order: 4,
                 anisotropy: 8,
                 sharpen: 0.0,
                 glow: true,
@@ -203,6 +206,7 @@ impl Preset {
                 reflection_probes: 2,
                 probe_count: 128,
                 antialiasing: 6,
+                blend_order: 4,
                 anisotropy: 8,
                 sharpen: 0.4,
                 glow: true,
@@ -242,6 +246,7 @@ impl Preset {
                 reflection_probes: 3,
                 probe_count: 256,
                 antialiasing: 6,
+                blend_order: 4,
                 anisotropy: 16,
                 sharpen: 0.4,
                 glow: true,
@@ -298,6 +303,7 @@ impl Preset {
             ..self.values()
         }
         .write(s);
+        crate::settings::autotune::Hold::chosen(s);
         s.graphics_saved_active = None;
         // the weather's quality follows the level, but is not one of its
         // values: choosing it in the Weather section keeps the level shown
@@ -630,6 +636,26 @@ pub(crate) fn upgrade_local_light_count(s: &mut Settings) {
     }
 }
 
+/// Settings files written before the order of the blended faces was a
+/// setting (version 39), all sorted: a profile exactly on Potato or Low
+/// keeps the sorted order, as these levels now say; any other takes the
+/// exact order at its finest, the default.
+pub(crate) fn upgrade_blend_order(s: &mut Settings) {
+    let on_level = |level: Preset| {
+        let level = level.values();
+        let current = Values {
+            blend_order: level.blend_order,
+            ..Values::read(s)
+        };
+        current.as_shown() == level.as_shown()
+    };
+    s.blend_order = if on_level(Preset::Potato) || on_level(Preset::Low) {
+        0
+    } else {
+        BLEND_ORDER_FULL
+    };
+}
+
 /// Aurora's effects beyond the Legacy Viewer's levels, which High and
 /// Deluxe turn on.
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -637,8 +663,18 @@ pub struct Effects {
     pub bloom: bool,
     pub bloom_strength: f32,
     pub contact_shadows: bool,
+    /// Soft sun shadows, experimental: off in every level. A backup or a
+    /// saved preset written before them holds none: off, the default size.
+    #[serde(default)]
+    pub soft_shadows: bool,
+    #[serde(default = "shadow_softness")]
+    pub shadow_softness: f32,
     pub screen_indirect_light: bool,
     pub screen_indirect_intensity: f32,
+}
+
+fn shadow_softness() -> f32 {
+    crate::settings::SHADOW_SOFTNESS
 }
 
 impl Effects {
@@ -647,6 +683,8 @@ impl Effects {
         bloom: false,
         bloom_strength: crate::settings::BLOOM_STRENGTH,
         contact_shadows: false,
+        soft_shadows: false,
+        shadow_softness: crate::settings::SHADOW_SOFTNESS,
         screen_indirect_light: false,
         screen_indirect_intensity: crate::settings::SCREEN_INDIRECT_INTENSITY,
     };
@@ -691,6 +729,11 @@ pub struct Values {
     pub reflection_probes: u8,
     pub probe_count: u32,
     pub antialiasing: u8,
+    /// `Settings::blend_order`: the sorted order in Potato and Low, the exact
+    /// one at its finest above (a backup or a saved preset written before
+    /// it holds none: the finest, the default then).
+    #[serde(default = "blend_order_full")]
+    pub blend_order: u8,
     pub anisotropy: u16,
     pub sharpen: f32,
     /// RenderGlow. Kept by a saved profile and the safe graphics backup; a
@@ -721,6 +764,48 @@ const ALL_LIGHTS: u32 = crate::scene::lights::MAX_LIGHTS as u32;
 
 fn all_lights() -> u32 {
     ALL_LIGHTS
+}
+
+/// `Settings::blend_order`: the exact order at its finest precision.
+pub(crate) const BLEND_ORDER_FULL: u8 = 4;
+/// `Settings::blend_order`: the stochastic transparency (aurora-render
+/// oit_stochastic.rs), an estimate of the exact order that is also drawn
+/// under MSAA.
+pub(crate) const BLEND_ORDER_STOCHASTIC: u8 = 5;
+
+fn blend_order_full() -> u8 {
+    BLEND_ORDER_FULL
+}
+
+/// The method behind a `Settings::blend_order`, as the preferences show it:
+/// one choice for the exact order, whose precision (1 fast to 4 full) is
+/// set beside it.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) enum BlendMethod {
+    Standard,
+    Exact,
+    Stochastic,
+}
+
+impl BlendMethod {
+    pub(crate) fn of(order: u8) -> Self {
+        match order {
+            0 => Self::Standard,
+            BLEND_ORDER_STOCHASTIC => Self::Stochastic,
+            _ => Self::Exact,
+        }
+    }
+
+    /// `Settings::blend_order` for this method; `precision`: the exact
+    /// order's (the full one when it is none of them).
+    pub(crate) fn order(self, precision: u8) -> u8 {
+        match self {
+            Self::Standard => 0,
+            Self::Exact if (1..=BLEND_ORDER_FULL).contains(&precision) => precision,
+            Self::Exact => BLEND_ORDER_FULL,
+            Self::Stochastic => BLEND_ORDER_STOCHASTIC,
+        }
+    }
 }
 
 fn default_projector_shadow_limit() -> u8 {
@@ -764,6 +849,13 @@ impl Values {
                 Effects::OFF.bloom_strength
             },
             contact_shadows: self.shadow_quality > 0 && e.contact_shadows,
+            soft_shadows: self.shadow_quality > 0 && e.soft_shadows,
+            // a size only while the effect is on
+            shadow_softness: if self.shadow_quality > 0 && e.soft_shadows {
+                round(e.shadow_softness, 0.05)
+            } else {
+                Effects::OFF.shadow_softness
+            },
             screen_indirect_light: indirect,
             screen_indirect_intensity: if indirect {
                 round(e.screen_indirect_intensity, 0.1)
@@ -792,11 +884,18 @@ impl Values {
     }
 
     pub(crate) fn read(s: &Settings) -> Values {
+        // while Autotune holds them, the user's draw distance and avatars:
+        // the level shown, a profile saved and the photo quality's own
+        // hold are the user's, not the tuned values (settings/autotune.rs)
+        let tuned = s
+            .autotune_hold
+            .as_ref()
+            .map_or_else(|| crate::settings::autotune::Tuned::read(s), |h| h.shown(s));
         Values {
-            draw_distance: s.draw_distance,
+            draw_distance: tuned.draw_distance,
             lod_factor: s.lod_factor,
             tree_lod_factor: s.tree_lod_factor,
-            max_avatars: s.max_avatars,
+            max_avatars: tuned.max_avatars,
             max_complexity: s.max_complexity,
             max_particles: s.max_particles,
             shadow_quality: s.shadow_quality,
@@ -811,6 +910,7 @@ impl Values {
             reflection_probes: s.reflection_probes,
             probe_count: s.probe_count,
             antialiasing: s.antialiasing,
+            blend_order: s.blend_order,
             anisotropy: s.anisotropy,
             sharpen: s.sharpen,
             glow: s.glow,
@@ -822,6 +922,8 @@ impl Values {
                 bloom: s.bloom,
                 bloom_strength: s.bloom_strength,
                 contact_shadows: s.contact_shadows,
+                soft_shadows: s.soft_shadows,
+                shadow_softness: s.shadow_softness,
                 screen_indirect_light: s.screen_indirect_light,
                 screen_indirect_intensity: s.screen_indirect_intensity,
             },
@@ -850,6 +952,7 @@ impl Values {
         s.reflection_probes = self.reflection_probes;
         s.probe_count = self.probe_count;
         s.antialiasing = self.antialiasing;
+        s.blend_order = self.blend_order;
         s.anisotropy = self.anisotropy;
         s.sharpen = self.sharpen;
         s.glow = self.glow;
@@ -862,6 +965,8 @@ impl Values {
         s.bloom = self.effects.bloom;
         s.bloom_strength = self.effects.bloom_strength;
         s.contact_shadows = self.effects.contact_shadows;
+        s.soft_shadows = self.effects.soft_shadows;
+        s.shadow_softness = self.effects.shadow_softness;
         s.screen_indirect_light = self.effects.screen_indirect_light;
         s.screen_indirect_intensity = self.effects.screen_indirect_intensity;
     }
@@ -869,6 +974,59 @@ impl Values {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn the_soft_shadows_are_off_in_every_level_at_the_default_size() {
+        for preset in Preset::ALL {
+            let e = preset.values().effects;
+            assert!(!e.soft_shadows, "{preset:?}");
+            assert_eq!(e.shadow_softness, crate::settings::SHADOW_SOFTNESS, "{preset:?}");
+            let mut settings = Settings {
+                soft_shadows: true,
+                shadow_softness: 1.7,
+                ..Settings::default()
+            };
+            preset.apply(&mut settings);
+            assert!(!settings.soft_shadows && settings.shadow_softness == crate::settings::SHADOW_SOFTNESS);
+        }
+    }
+
+    #[test]
+    fn a_preset_saved_before_the_soft_shadows_reads_them_off_and_a_size_counts_only_while_on() {
+        let mut settings = Settings::default();
+        Preset::Deluxe.apply(&mut settings);
+        let mut saved = serde_json::to_value(Values::read(&settings)).expect("save preset");
+        let effects = saved.get_mut("effects").and_then(|e| e.as_object_mut()).expect("effects");
+        effects.remove("soft_shadows");
+        effects.remove("shadow_softness");
+        let old: Values = serde_json::from_value(saved).expect("older preset");
+        assert!(!old.effects.soft_shadows);
+        assert_eq!(old.effects.shadow_softness, crate::settings::SHADOW_SOFTNESS);
+        // the size shown is the default while the effect is off
+        let mut v = Values::read(&settings);
+        v.effects.shadow_softness = 1.7;
+        v.effects.soft_shadows = false;
+        assert_eq!(v.as_shown().effects.shadow_softness, crate::settings::SHADOW_SOFTNESS);
+        v.effects.soft_shadows = true;
+        assert!((v.as_shown().effects.shadow_softness - 1.7).abs() < 0.03);
+    }
+
+    #[test]
+    fn the_shadow_softness_and_intensity_are_sanitised() {
+        for (softness, intensity) in [(f32::NAN, f32::NAN), (-3.0, -1.0), (50.0, 9.0), (f32::INFINITY, f32::NEG_INFINITY)] {
+            let s = Settings {
+                shadow_softness: softness,
+                shadow_intensity: intensity,
+                ..Settings::default()
+            }
+            .sanitized();
+            assert!(
+                (0.0..=crate::settings::SHADOW_SOFTNESS_MAX).contains(&s.shadow_softness),
+                "{softness}"
+            );
+            assert!((0.0..=1.0).contains(&s.shadow_intensity), "{intensity}");
+        }
+    }
+
     #[test]
     fn projector_shadow_budget_is_saved_with_custom_presets_and_old_presets_keep_two() {
         let mut settings = Settings::default();
@@ -887,6 +1045,22 @@ mod tests {
     }
 
     use super::*;
+
+    #[test]
+    fn the_exact_order_is_one_choice_that_keeps_its_precision() {
+        // every saved value comes back from its method and its own precision
+        for order in 0..=BLEND_ORDER_STOCHASTIC {
+            assert_eq!(BlendMethod::of(order).order(order), order);
+        }
+        assert_eq!(BlendMethod::of(2), BlendMethod::Exact);
+        // chosen again after another method: the precision it was left at
+        assert_eq!(BlendMethod::Exact.order(2), 2);
+        // or the full one, the default, when none was
+        assert_eq!(BlendMethod::Exact.order(0), BLEND_ORDER_FULL);
+        assert_eq!(BlendMethod::Exact.order(BLEND_ORDER_STOCHASTIC), BLEND_ORDER_FULL);
+        assert_eq!(BlendMethod::Standard.order(3), 0);
+        assert_eq!(BlendMethod::Stochastic.order(3), BLEND_ORDER_STOCHASTIC);
+    }
 
     #[test]
     fn levels_set_the_weather_quality_and_choosing_it_keeps_the_level() {
@@ -1195,7 +1369,7 @@ mod tests {
     fn values_stay_inside_what_the_page_offers() {
         for preset in Preset::ALL {
             let v = preset.values();
-            assert!((32.0..=512.0).contains(&v.draw_distance));
+            assert!((crate::settings::DRAW_DISTANCE_MIN..=crate::settings::DRAW_DISTANCE_MAX).contains(&v.draw_distance));
             assert!((0.5..=4.0).contains(&v.lod_factor));
             assert!((1..=100).contains(&v.max_avatars));
             assert!(v.max_particles <= 8192);

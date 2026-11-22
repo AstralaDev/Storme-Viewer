@@ -1,5 +1,5 @@
 //! Build script: tells the viewer which cargo profile built it, for the
-//! window title ("Aurora Viewer <version> (Dev)"): cargo only exposes `debug` /
+//! window title ("Storme Viewer <version> (Dev)"): cargo only exposes `debug` /
 //! `release` (PROFILE), while the profile's target directory names the
 //! custom ones (`debugging`, `ci`). On Windows it also embeds the resources
 //! of aurora-viewer.exe: its icon and its version block.

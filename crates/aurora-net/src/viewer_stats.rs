@@ -34,7 +34,7 @@ const JITTER_WINDOW_SECS: f64 = 5.0;
 /// (`NetClient::set_viewer_stats`).
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct ViewerSide {
-    /// LLVersionInfo::getChannelAndVersion: "Aurora Viewer 0.7.5.0".
+    /// LLVersionInfo::getChannelAndVersion: "Storme Viewer 0.7.5.0".
     pub version: String,
     /// The interface language (LLUI::getLanguage).
     pub language: String,

@@ -7,7 +7,7 @@ use serde_json::Value;
 use std::time::{Duration, Instant};
 
 pub const ISSUES: &str = "https://github.com/AstralaDev/Storme-Viewer/issues";
-const API: &str = "https://api.github.com/repos/Aurora-Viewer/Aurora-Viewer/issues";
+const API: &str = "https://api.github.com/repos/AstralaDev/Storme-Viewer/issues";
 pub const VERIFY: &str = "https://github.com/login/device";
 // Public identifier, supplied by the project's GitHub App registration.
 pub const CLIENT_ID: &str = "Iv23liT7PLWClMLztI1W";
@@ -203,13 +203,13 @@ impl Drop for Github {
 }
 
 fn client() -> Result<reqwest::Client, Failure> {
-    reqwest::Client::builder()
+    aurora_proxy::http_client(|b| b
         .user_agent(aurora_version::user_agent())
         .https_only(true)
         .retry(reqwest::retry::never())
         .redirect(reqwest::redirect::Policy::none())
         .timeout(Duration::from_secs(20))
-        .build()
+        )
         .map_err(|_| Failure::Network)
 }
 

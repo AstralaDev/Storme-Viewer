@@ -203,6 +203,16 @@ pub fn page(cx: &mut Cx, tab: usize) {
                     &field!(camera.click_avatar_keeps_camera),
                 );
                 cx.toggle(
+                    tr!("ui-options-camera-frame-while-posing"),
+                    tr!("ui-options-camera-frame-while-posing-tip"),
+                    &field!(camera.frame_while_posing),
+                );
+                cx.toggle(
+                    tr!("ui-options-camera-still-while-posing"),
+                    tr!("ui-options-camera-still-while-posing-tip"),
+                    &field!(camera.still_while_posing),
+                );
+                cx.toggle(
                     tr!("ui-options-camera-follow-the-targeted-object"),
                     tr!("ui-options-camera-the-camera-follows-the-object-it-is-focused-on"),
                     &field!(camera.track_focus_object),
@@ -311,6 +321,31 @@ fn mouselook(cx: &mut Cx) {
             tr!("ui-options-camera-show-interface-tip"),
             &field!(camera.show_interface_in_mouselook),
         );
+        // FSMouselookCombatFeatures, ExodusMouselookIFF and
+        // ExodusMouselookIFFRange (panel_preferences_move.xml)
+        cx.toggle(
+            tr!("ui-options-camera-combat"),
+            tr!("ui-options-camera-combat-tip"),
+            &field!(camera.mouselook_combat),
+        );
+        let off = !cx.s.camera.mouselook_combat;
+        cx.subs(off, |cx| {
+            cx.toggle(
+                tr!("ui-options-camera-combat-markers"),
+                tr!("ui-options-camera-combat-markers-tip"),
+                &field!(camera.mouselook_iff),
+            );
+            let off = !cx.s.camera.mouselook_iff;
+            cx.subs(off, |cx| {
+                cx.slider(
+                    tr!("ui-options-camera-combat-range"),
+                    "",
+                    &field!(camera.mouselook_iff_range),
+                    0.0..=500.0,
+                    " m",
+                );
+            });
+        });
     });
 }
 
